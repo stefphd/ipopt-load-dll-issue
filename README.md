@@ -46,11 +46,6 @@ Discretized on N intervals (N+1 nodes) via trapezoidal collocation:
 
 where f2_j = (1 - x1_j^2) * x2_j - x1_j + u_j.
 
-This is a classic optimal-control benchmark (part of the COPS test set)
-and, unlike a replicated/block problem, gives a genuinely banded
-(block-tridiagonal) KKT structure that scales the way real large-scale
-IPOPT problems do.
-
 Variable layout: for node k = 0..N, x[3k+0]=x1_k, x[3k+1]=x2_k, x[3k+2]=u_k
 so n = 3*(N+1).
 Constraint layout: for interval k = 0..N-1, row 2k = defect1_k,
