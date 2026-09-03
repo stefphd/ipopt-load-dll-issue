@@ -1,0 +1,39 @@
+name: Windows build
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  BUILD_CONFIG: RelWithDebInfo
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        ipopt_version: [3.14.17, 3.14.18, 3.14.19, 3.14.20]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Environment
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Setup Ninja
+      uses: seanmiddleditch/gha-setup-ninja@master
+
+    - name: Build
+      run: |
+        mkdir build
+        cd build
+        cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=${{ env.BUILD_CONFIG }} -DIPOPT_VERSION=${{ matrix.ipopt_version }}
+        cmake --build . --config ${{ env.BUILD_CONFIG }} --parallel 
+
+    - name: Run
+      shell: pwsh
+      run: |
+        cd build/bin
+        .\app.exe 1000
