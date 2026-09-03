@@ -80,40 +80,33 @@ The argument is the number of times to load the DLL, solve, and unload it (defau
 
 ## Debugging
 
-After running the program with a sufficiently high number of load/unload cycles (say 1000) you can attach a debugger to the process and set a breakpoint on `TerminateProcess` in `kernel32.dll` to catch the crash and then resume the process.
-When the breakpoint is hit, you can inspect the call stack to see where the crash originated.
+At the top of `main.cpp`, `HOOK_TERMINATE_PROCESS` is defined to enable hooking the Windows `TerminateProcess`. 
+The hook will capture the stack trace and print the frames, which can be inspected to see where the crash originated.
 
-In the LLDB debugger, you can set the breakpoint with the following command:
-
-```bat
-breakpoint set --name TerminateProcess --shlib kernel32.dll
-```
-
-and inspect the call stack with:
-
-```bat
-bt
-```
-
-The expected output is something like
+After running the program with a sufficiently high number of load/unload cycles (say 1000) you can see the crash in the console output, which will look like this:
 
 ```
-* thread #1, name = 'Main Thread', stop reason = breakpoint 1.1
-  * frame #0: 0x00007ffd811f21b0 kernel32.dll`TerminateProcess
-    frame #1: 0x00007ffbb1e94dfd coinmumps-3.dll
-    frame #2: 0x00007ffbb1eac504 coinmumps-3.dll
-    frame #3: 0x00007ffbb1e6121b coinmumps-3.dll
-    [...]
-    frame #18: 0x00007ffb98027022 ipopt-3.dll
-    frame #19: 0x00007ffb97fa6fc1 ipopt-3.dll
-    frame #20: 0x00007ffb97f96eff ipopt-3.dll
-    frame #21: 0x00007ffb97e954fb ipopt-3.dll
-    [...]
-    frame #31: 0x00007ffd53f12d54 solver_dll.dll`solve() at solver_dll.cpp:20
-    frame #32: 0x00007ff7e2d69279 app.exe`main(argc=<unavailable>, argv=<unavailable>) at main.cpp:64
+[HOOK] TerminateProcess(exitCode=3) called!
+  [0] MyTerminateProcess - 0x7FF7625C6C10
+  [1] dmumps_c - 0x7FFC075823E0
+  [2] dmumps_c - 0x7FFC075823E0
+  [...]
+  [15] dmumps_c - 0x7FFC075823E0
+  [16] dmumps_c - 0x7FFC075823E0
+  [17] Ipopt::TNLPReducer::finalize_solution - 0x7FFBFA414700
+  [18] IpoptGetAvailableLinearSolvers - 0x7FFBFA3B27A0
+  [19] Ipopt::PDSearchDirCalculator::InitializeImpl - 0x7FFBFA37F810
+  [...]
+  [28] Ipopt::IpoptApplication::OptimizeNLP - 0x7FFBFA3D8250
+  [29] Ipopt::IpoptApplication::OptimizeTNLP - 0x7FFBFA3D80C0
+  [30] solve - 0x7FFD56442A50
+  [31] main - 0x7FF7625C9460
+  [32] __scrt_common_main_seh - 0x7FF7625CC164
+  [33] BaseThreadInitThunk - 0x7FFD811DCCA0
+  [34] RtlUserThreadStart - 0x7FFD8200AD40
 ```
 
-where it is evident that `TerminateProcess` is called from `coinmumps-3.dll`, i.e. inside the linear solver MUMPS.
+where it is evident that `TerminateProcess` is called from `dmumps_c`, i.e. inside the linear solver MUMPS.
 
 To further inspect where the issue originates, you can set the IPOPT option
 

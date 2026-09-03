@@ -4,8 +4,9 @@
 // link against solver_dll.lib or include solver_api.h/IPOPT headers: the
 // only thing it needs to know is the exported function's signature.
 
-#include <windows.h>
+#define HOOK_TERMINATE_PROCESS
 
+#include <windows.h>
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
@@ -13,15 +14,15 @@
 #include <string>
 #undef max
 
+#ifdef HOOK_TERMINATE_PROCESS
+#   include <dbghelp.h>
+#   pragma comment(lib, "dbghelp.lib")
+#endif
+
 namespace fs = std::filesystem;
 
-// Must match the signature of `solve` exported by solver_dll.dll
-// (see solver_dll/include/solver_api.h).
 using SolveFunc = int (*)();
 
-// Returns the directory containing the running executable, so solver_dll.dll
-// (built into the same output directory) can be found regardless of the
-// process's current working directory.
 static fs::path get_executable_dir() {
     char buffer[MAX_PATH];
     DWORD len = GetModuleFileNameA(nullptr, buffer, MAX_PATH);
@@ -30,6 +31,68 @@ static fs::path get_executable_dir() {
     }
     return fs::path(buffer).parent_path();
 }
+
+#ifdef HOOK_TERMINATE_PROCESS
+typedef BOOL (WINAPI *TerminateProcess_t)(HANDLE, UINT);
+static TerminateProcess_t g_realTerminateProcess = nullptr;
+
+BOOL WINAPI MyTerminateProcess(HANDLE hProcess, UINT uExitCode) {
+    fprintf(stderr, "[HOOK] TerminateProcess(exitCode=%u) called!\n", uExitCode);
+    // Capture and print a stack trace
+    void* stack[64];
+    USHORT frames = CaptureStackBackTrace(0, 64, stack, nullptr);
+    SymInitialize(GetCurrentProcess(), NULL, TRUE);
+    for (USHORT i = 0; i < frames; i++) {
+        DWORD64 addr = (DWORD64)(stack[i]);
+        char buffer[sizeof(SYMBOL_INFO) + 256];
+        SYMBOL_INFO* symbol = (SYMBOL_INFO*)buffer;
+        symbol->MaxNameLen = 255;
+        symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+        if (SymFromAddr(GetCurrentProcess(), addr, 0, symbol)) {
+            fprintf(stderr, "  [%d] %s - 0x%0llX\n", i, symbol->Name, symbol->Address);
+        }
+        else {
+            fprintf(stderr, "  [%d] 0x%0llX\n", i, addr);
+        }
+    }
+    return g_realTerminateProcess(hProcess, uExitCode);
+}
+
+void HookTerminateProcessInModule(const char* moduleName) {
+    HMODULE hMod = GetModuleHandleA(moduleName);
+    if (!hMod) return;
+
+    HMODULE hKernel32 = GetModuleHandleA("kernel32.dll");
+    g_realTerminateProcess = (TerminateProcess_t)GetProcAddress(hKernel32, "TerminateProcess");
+
+    PIMAGE_DOS_HEADER dosHeader = (PIMAGE_DOS_HEADER)hMod;
+    PIMAGE_NT_HEADERS ntHeaders = (PIMAGE_NT_HEADERS)((BYTE*)hMod + dosHeader->e_lfanew);
+    PIMAGE_IMPORT_DESCRIPTOR importDesc = (PIMAGE_IMPORT_DESCRIPTOR)((BYTE*)hMod +
+        ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
+
+    for (; importDesc->Name != 0; importDesc++) {
+        const char* name = (const char*)((BYTE*)hMod + importDesc->Name);
+        if (_stricmp(name, "kernel32.dll") != 0) {
+            continue;
+        }
+
+        PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)((BYTE*)hMod + importDesc->FirstThunk);
+        PIMAGE_THUNK_DATA origThunk = (PIMAGE_THUNK_DATA)((BYTE*)hMod + importDesc->OriginalFirstThunk);
+
+        for (; origThunk->u1.Function != 0; origThunk++, thunk++) {
+            if (IMAGE_SNAP_BY_ORDINAL(origThunk->u1.Ordinal)) continue;
+            PIMAGE_IMPORT_BY_NAME funcName = (PIMAGE_IMPORT_BY_NAME)((BYTE*)hMod + origThunk->u1.AddressOfData);
+            if (strcmp((char*)funcName->Name, "TerminateProcess") == 0) {
+                DWORD oldProtect;
+                VirtualProtect(&thunk->u1.Function, sizeof(void*), PAGE_READWRITE, &oldProtect);
+                thunk->u1.Function = (ULONG_PTR)MyTerminateProcess;
+                VirtualProtect(&thunk->u1.Function, sizeof(void*), oldProtect, &oldProtect);
+                return;
+            }
+        }
+    }
+}
+#endif
 
 int main(int argc, char** argv) {
     int numIterations = 1;
@@ -52,6 +115,10 @@ int main(int argc, char** argv) {
             std::cout << "  DLL loaded.\n";
         }
 
+#ifdef HOOK_TERMINATE_PROCESS
+        HookTerminateProcessInModule("coinmumps-3.dll");
+#endif
+
         // --- Resolve the exported solve() function ---
         const auto solveFn = reinterpret_cast<SolveFunc>(GetProcAddress(hModule, "solve"));
         if (solveFn == nullptr) {
@@ -61,7 +128,7 @@ int main(int argc, char** argv) {
         }
 
         // --- Call it ---
-        int status = solveFn();
+        solveFn();
 
         // --- Unload the DLL ---
         if (!FreeLibrary(hModule)) {

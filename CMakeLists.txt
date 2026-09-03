@@ -26,7 +26,7 @@ include(FetchContent)
 # NOTE: verify this matches an actual tag under
 # https://github.com/coin-or/Ipopt/releases before building; update if a
 # newer release is preferred.
-set(IPOPT_VERSION 3.14.17)
+set(IPOPT_VERSION 3.14.20)
 
 set(IPOPT_RELEASE_URL https://github.com/coin-or/Ipopt/releases/download/releases%2F${IPOPT_VERSION})
 set(IPOPT_ZIP_NAME Ipopt-${IPOPT_VERSION}-win64-msvs2022-md)
