@@ -15,7 +15,7 @@ jobs:
 
     strategy:
       matrix:
-        ipopt_version: ["3.14.17", "3.14.18", "3.14.19", "3.14.20"]
+        ipopt_version: [3.14.17, 3.14.18, 3.14.19, 3.14.20]
 
     steps:
     - name: Checkout repository
@@ -31,7 +31,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=${{ env.BUILD_CONFIG }} -DIPOPT_VERSION=${{ matrix.ipopt_version }}
+        cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=${{ env.BUILD_CONFIG }} -DIPOPT_VERSION="${{ matrix.ipopt_version }}"
         cmake --build . --config ${{ env.BUILD_CONFIG }} --parallel 
 
     - name: Run

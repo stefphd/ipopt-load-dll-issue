@@ -32,6 +32,7 @@ set(IPOPT_RELEASE_URL https://github.com/coin-or/Ipopt/releases/download/release
 set(IPOPT_ZIP_NAME Ipopt-${IPOPT_VERSION}-win64-msvs2022-md)
 FetchContent_Declare(ipopt_release URL ${IPOPT_RELEASE_URL}/${IPOPT_ZIP_NAME}.zip DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 FetchContent_Declare(ipopt_debug URL ${IPOPT_RELEASE_URL}/${IPOPT_ZIP_NAME}d.zip DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+message(STATUS "Fetching IPOPT ${IPOPT_VERSION} release and debug binaries from ${IPOPT_RELEASE_URL}")
 FetchContent_MakeAvailable(ipopt_release)
 FetchContent_MakeAvailable(ipopt_debug)
 add_library(ipopt SHARED IMPORTED GLOBAL)

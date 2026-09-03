@@ -55,7 +55,7 @@ BOOL WINAPI MyTerminateProcess(HANDLE hProcess, UINT uExitCode) {
             fprintf(stderr, "  [%d] 0x%0llX\n", i, addr);
         }
     }
-    return g_realTerminateProcess(hProcess, uExitCode);
+    return g_realTerminateProcess(hProcess, 0);
 }
 
 void HookTerminateProcessInModule(const char* moduleName) {
