@@ -4,8 +4,7 @@ This repository demonstrates a crash that occurs on Windows when IPOPT is loaded
 The issue occurs when the DLL is repeatedly loaded and unloaded. 
 Depending on the problem dimension, the program suddenly and deterministically exits with return code `3` during a call to `IpoptApplication::OptimizeTNLP`.
 
-The crash appears to occur during the factorization step in the MUMPS linear solver, where `TerminateProcess` is called. 
-One possible explanation is a memory-allocation failure that ultimately triggers a Fortran `STOP` statement, causing the process to terminate.
+The crash appears to occur during the factorization step in the MUMPS linear solver, with `TerminateProcess` being called in some way (e.g. Fortran `STOP` statement)
 
 The problem used to reproduce the issue is a nonlinear programming problem obtained by transcribing the Van der Pol optimal-control problem. 
 The problem is sufficiently large to trigger the crash, whereas standard IPOPT tutorial examples, such as HS071, are too small to reproduce it.
@@ -154,11 +153,3 @@ After running the program again, you will see a lot of MUMPS output in the conso
 ```
 
 which shows that termination happens during the MUMPS factorization step.
-The missing lines that appear in a normal MUMPS factorization step are the following:
-
-```
-** Memory allocated, total in Mbytes           (INFOG(19)):           5
-** Memory effectively used, total in Mbytes    (INFOG(22)):           4
-```
-
-The lack of the above output probably indicates that MUMPS failed to allocate memory for the factorization.
